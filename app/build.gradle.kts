@@ -16,7 +16,9 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "io.github.aedev.flow"
+        // This fork ships under its own Android identity, distinct from the
+        // upstream Flow app — both can be installed side by side.
+        applicationId = "com.flowtube.app"
         minSdk = 26
         targetSdk = 36
         versionCode = 18
@@ -54,7 +56,9 @@ android {
         create("github") {
             dimension = "version"
             isDefault = true
-            buildConfigField("Boolean", "UPDATER_ENABLED", "true")
+            // Upstream releases are signed with a different key and can never
+            // install over this fork's identity — keep the updater off.
+            buildConfigField("Boolean", "UPDATER_ENABLED", "false")
             buildConfigField("String", "DISCORD_APPLICATION_ID", "\"1526515771021328514\"")
         }
         create("foss") {
@@ -134,8 +138,10 @@ android {
                 signingConfig = signingConfigs.getByName("release")
                 println("Using RELEASE signing config with keystore: ${releaseKeystore.absolutePath}")
             } else {
-                signingConfig = null // Let Gradle build an unsigned APK for IzzyOnDroid/F-Droid
-                println("WARNING: Release keystore not found. Building UNSIGNED release APK.")
+                // No release keystore configured for this fork — fall back to
+                // debug signing so the produced APK is directly installable.
+                signingConfig = signingConfigs.getByName("debug")
+                println("WARNING: Release keystore not found. Building DEBUG-SIGNED release APK.")
             }
         }
     }
