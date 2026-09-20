@@ -24,8 +24,7 @@ import io.github.aedev.flow.data.music.model.MUSIC_GENRE_SOURCE_PREFIX
 import io.github.aedev.flow.data.music.model.MusicItemType
 import io.github.aedev.flow.data.music.model.MusicPlaylist
 import io.github.aedev.flow.data.music.model.MusicTrack
-import io.github.aedev.flow.data.recommendation.MusicSection
-import io.github.aedev.flow.data.recommendation.music.MusicTimeBucket
+import io.github.aedev.flow.data.music.MusicSection
 import io.github.aedev.flow.innertube.pages.HomePage
 import io.github.aedev.flow.innertube.pages.MoodAndGenres
 import io.github.aedev.flow.ui.components.music.header.MusicSectionAction
@@ -34,7 +33,6 @@ import io.github.aedev.flow.ui.components.music.sheet.MusicCollectionActionItem
 import io.github.aedev.flow.ui.components.music.sheet.toCollectionActionItem
 import io.github.aedev.flow.ui.components.shared.FlowFeedProgress
 import io.github.aedev.flow.ui.screens.music.MusicUiState
-import io.github.aedev.flow.ui.screens.music.MusicViewModel
 import java.util.Locale
 
 /**
@@ -131,19 +129,6 @@ fun LazyListScope.musicHomeFeed(
         }
     }
 
-    val rotationBucket = uiState.rotationBucket
-    if (uiState.rotationTracks.isNotEmpty() && rotationBucket != null) {
-        item(key = "rotation") {
-            BrainShelf(
-                title = stringResource(rotationTitleRes(rotationBucket)),
-                tracks = uiState.rotationTracks,
-                playFrom = "rotation",
-                onSongClick = onSongClick,
-                onTrackMenu = onTrackMenu,
-            )
-        }
-    }
-
     if (speedDialTracks.isNotEmpty()) {
         item(key = "speed_dial") {
             SpeedDialSection(
@@ -163,31 +148,6 @@ fun LazyListScope.musicHomeFeed(
                 playFrom = "rediscover",
                 onSongClick = onSongClick,
                 onTrackMenu = onTrackMenu,
-            )
-        }
-    }
-
-    if (uiState.deepCutTracks.isNotEmpty()) {
-        item(key = "deep_cuts") {
-            BrainShelf(
-                title = stringResource(R.string.section_deep_cuts),
-                tracks = uiState.deepCutTracks,
-                playFrom = "deep_cuts",
-                onSongClick = onSongClick,
-                onTrackMenu = onTrackMenu,
-            )
-        }
-    }
-
-    if (uiState.artistsForYou.isNotEmpty()) {
-        item(key = "artists_for_you") {
-            MusicArtistShelf(
-                title = stringResource(R.string.section_artists_for_you),
-                artists = uiState.artistsForYou,
-                key = { "artists_for_you:${it.channelId}" },
-                name = { it.name },
-                thumbnailUrl = { it.thumbnailUrl },
-                onArtistClick = { onArtistClick(it.channelId) },
             )
         }
     }
@@ -276,17 +236,6 @@ fun LazyListScope.musicHomeFeed(
                     id = "top_albums",
                     titleRes = R.string.section_top_albums,
                     collections = uiState.topAlbums,
-                    isAlbum = true,
-                    onAlbumClick = onAlbumClick,
-                    onCollectionMenu = ::collectionMenu,
-                )
-            }
-
-            HomeSectionType.FAVORITE_ARTIST_ALBUMS -> {
-                collectionShelf(
-                    id = "favorite_artist_albums",
-                    titleRes = R.string.section_from_artists_you_love,
-                    collections = uiState.favoriteArtistAlbums,
                     isAlbum = true,
                     onAlbumClick = onAlbumClick,
                     onCollectionMenu = ::collectionMenu,
@@ -584,7 +533,6 @@ private fun LazyListScope.similarTo(
     onTrackMenu: (MusicTrack) -> Unit,
     onCollectionMenu: (MusicTrack) -> Unit,
 ) {
-    val dailyMixes = uiState.dailyMixSections
     val moreFromArtist = uiState.moreFromArtistSections
 
     fun moreFromShelf(section: MusicSection) {
@@ -603,12 +551,12 @@ private fun LazyListScope.similarTo(
         }
     }
 
-    (dailyMixes + uiState.similarToSections).forEachIndexed { index, section ->
+    uiState.similarToSections.forEachIndexed { index, section ->
         item(key = "similar_to:$index:${section.title}") {
             MusicTrackCardShelf(
                 title = section.title,
                 tracks = section.tracks,
-                lane = if (index < dailyMixes.size) MusicLane.Hero else MusicLane.Cards,
+                lane = MusicLane.Cards,
                 keyNamespace = "similar_${index}_${section.title}",
                 subtitle = section.label ?: section.subtitle,
                 leading =
@@ -620,8 +568,6 @@ private fun LazyListScope.similarTo(
                         MusicSectionAction.Navigate {
                             if (section.isArtistSeed) {
                                 onArtistClick(seedId)
-                            } else if (seedId.startsWith(MusicViewModel.DAILY_MIX_ID_PREFIX)) {
-                                onAlbumClick(seedId)
                             }
                         }
                     },
@@ -729,10 +675,3 @@ private fun String.isDuplicateOfADedicatedShelf(): Boolean =
         "Listen again",
     ).any { contains(it, ignoreCase = true) }
 
-private fun rotationTitleRes(bucket: MusicTimeBucket): Int =
-    when (bucket) {
-        MusicTimeBucket.WEEKDAY_MORNING, MusicTimeBucket.WEEKEND_MORNING -> R.string.section_rotation_morning
-        MusicTimeBucket.WEEKDAY_AFTERNOON, MusicTimeBucket.WEEKEND_AFTERNOON -> R.string.section_rotation_afternoon
-        MusicTimeBucket.WEEKDAY_EVENING, MusicTimeBucket.WEEKEND_EVENING -> R.string.section_rotation_evening
-        MusicTimeBucket.WEEKDAY_NIGHT, MusicTimeBucket.WEEKEND_NIGHT -> R.string.section_rotation_night
-    }

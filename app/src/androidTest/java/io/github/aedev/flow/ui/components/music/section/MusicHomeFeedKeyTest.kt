@@ -13,7 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import io.github.aedev.flow.data.music.model.MusicTrack
-import io.github.aedev.flow.data.recommendation.MusicSection
+import io.github.aedev.flow.data.music.MusicSection
 import io.github.aedev.flow.ui.screens.music.MusicUiState
 import org.junit.Rule
 import org.junit.Test

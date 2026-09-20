@@ -1,15 +1,11 @@
 package io.github.aedev.flow.ui
 
 import androidx.compose.animation.*
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -25,7 +21,6 @@ import io.github.aedev.flow.data.model.Video
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.data.shorts.queue.ShortsQueueSource
 import io.github.aedev.flow.data.shorts.queue.openAtVideoId
-import io.github.aedev.flow.player.EnhancedMusicPlayerManager
 import io.github.aedev.flow.player.GlobalPlayerState
 import io.github.aedev.flow.ui.components.musicplayer.MusicPlayerSheetState
 import io.github.aedev.flow.ui.components.videoplayer.PlayerDraggableState
@@ -1127,8 +1122,6 @@ fun NavGraphBuilder.flowAppGraph(
                 ArtistPage(
                     artistDetails = details,
                     downloadedTrackIds = uiState.downloadedTrackIds,
-                    insights = uiState.artistInsights,
-                    knownRelatedArtistIds = uiState.knownRelatedArtistIds,
                     onBackClick = { navController.popBackStack() },
                     onTrackClick = { track, queue ->
                         musicPlayerViewModel.loadAndPlayTrack(track, queue)
@@ -1227,8 +1220,6 @@ fun NavGraphBuilder.flowAppGraph(
             if (playlistId.startsWith("community_")) {
                 val genre = playlistId.substringAfter("community_")
                 musicViewModel.loadCommunityPlaylist(genre)
-            } else if (playlistId.startsWith(MusicViewModel.DAILY_MIX_ID_PREFIX)) {
-                musicViewModel.loadDailyMixPage(playlistId)
             } else {
                 musicViewModel.fetchPlaylistDetails(playlistId)
             }

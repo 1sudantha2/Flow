@@ -33,7 +33,6 @@ import io.github.aedev.flow.R
 import io.github.aedev.flow.data.music.model.ArtistDetails
 import io.github.aedev.flow.data.music.model.MusicPlaylist
 import io.github.aedev.flow.data.music.model.MusicTrack
-import io.github.aedev.flow.data.recommendation.music.MusicArtistInsights
 import io.github.aedev.flow.ui.components.music.common.rememberMusicCollectionColorScheme
 import io.github.aedev.flow.ui.components.music.detail.ArtistBio
 import io.github.aedev.flow.ui.components.music.detail.ArtistHero
@@ -69,8 +68,6 @@ fun ArtistPage(
     onFollowClick: () -> Unit,
     modifier: Modifier = Modifier,
     downloadedTrackIds: Set<String> = emptySet(),
-    insights: MusicArtistInsights? = null,
-    knownRelatedArtistIds: Set<String> = emptySet(),
     onSeeAllClick: (String, String?) -> Unit = { _, _ -> },
 ) {
     val scrollState = rememberLazyListState()
@@ -231,23 +228,6 @@ fun ArtistPage(
                     )
                 }
 
-                if (insights != null && insights.topTracks.isNotEmpty()) {
-                    item(key = "history_header") {
-                        MusicSectionHeader(
-                            title = stringResource(R.string.section_your_history),
-                            subtitle = insights.summaryLine(),
-                        )
-                    }
-                    segmentedTracks(
-                        id = "history",
-                        tracks = insights.topTracks.take(TOP_TRACKS_SHOWN),
-                        queue = insights.topTracks,
-                        downloadedTrackIds = downloadedTrackIds,
-                        onTrackClick = onTrackClick,
-                        onTrackMenu = ::showTrackMenu,
-                    )
-                }
-
                 if (artistDetails.singles.isNotEmpty()) {
                     item(key = "singles") {
                         MusicCollectionShelf(
@@ -317,10 +297,6 @@ fun ArtistPage(
                             key = { "related:${it.channelId}" },
                             name = { it.name },
                             thumbnailUrl = { it.thumbnailUrl },
-                            subtitle = { artist ->
-                                stringResource(R.string.artist_known_related_badge)
-                                    .takeIf { artist.channelId in knownRelatedArtistIds }
-                            },
                             onArtistClick = { onArtistClick(it.channelId) },
                         )
                     }
@@ -361,16 +337,6 @@ private fun seeAllAction(
     params: String?,
     onSeeAllClick: (String, String?) -> Unit,
 ): MusicSectionAction? = browseId?.let { MusicSectionAction.SeeAll { onSeeAllClick(it, params) } }
-
-@Composable
-private fun MusicArtistInsights.summaryLine(): String {
-    val plays = stringResource(R.string.artist_insights_played_times, this.plays)
-    return if (liked) {
-        "$plays ${stringResource(R.string.metadata_separator)} ${stringResource(R.string.artist_insights_liked)}"
-    } else {
-        plays
-    }
-}
 
 @Composable
 private fun MusicPlaylist.collectionSubtitle(showAuthor: Boolean): String =

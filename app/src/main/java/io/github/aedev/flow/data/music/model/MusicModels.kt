@@ -58,6 +58,13 @@ fun MusicTrack.withTypedArtists(): MusicTrack {
     return if (raw.all { it is MusicArtist }) this else copy(artists = raw.filterIsInstance<MusicArtist>())
 }
 
+/** The canonical key for the track's primary artist — channel id when known, else a clean name. */
+fun MusicTrack.primaryArtistKey(): String {
+    val primary = artists.firstOrNull()
+    val id = (primary?.id ?: channelId.takeIf { it.isNotBlank() })?.trim().orEmpty()
+    return id.ifEmpty { (primary?.name ?: artist).trim().lowercase() }
+}
+
 data class DailyDiscoverItem(
     val seed: MusicTrack,
     val recommendation: MusicTrack,

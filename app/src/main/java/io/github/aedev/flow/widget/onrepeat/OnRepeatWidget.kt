@@ -27,7 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
-/** The music brain's On Repeat shelf on the home screen — zero network to render. */
+/** The On Repeat shelf — the user's most recent listening history, zero network to render. */
 class OnRepeatWidget : GlanceAppWidget() {
     companion object {
         private const val MAX_ITEMS = 8
@@ -47,8 +47,10 @@ class OnRepeatWidget : GlanceAppWidget() {
         val items =
             withContext(Dispatchers.IO) {
                 widgetEntryPoint(context)
-                    .musicBrainEngine()
-                    .heavyRotationTracks(MAX_ITEMS)
+                    .playlistRepository()
+                    .history
+                    .first()
+                    .take(MAX_ITEMS)
                     .mapIndexed { index, track ->
                         WidgetVideoItem(
                             videoId = track.videoId,

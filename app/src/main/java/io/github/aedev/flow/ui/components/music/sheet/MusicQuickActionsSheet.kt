@@ -9,7 +9,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.outlined.Album
 import androidx.compose.material.icons.outlined.Bedtime
-import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Info
@@ -18,7 +17,6 @@ import androidx.compose.material.icons.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.PlaylistPlay
 import androidx.compose.material.icons.outlined.QueueMusic
 import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -32,7 +30,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.aedev.flow.R
@@ -216,59 +213,6 @@ fun MusicQuickActionsSheet(
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
             }
-
-            item { Spacer(modifier = Modifier.height(16.dp)) }
-
-            // Recommendation feedback — the two-layer escalation from the music brain:
-            // "not interested" soft-suppresses the artist, a repeat (or the explicit
-            // action) blocks permanently. Reversible in the Control Center.
-            item {
-                val artistName = track.artists.firstOrNull()?.name ?: track.artist
-                FlowMenuSectionHeader(stringResource(R.string.recommendations_header))
-                FlowMenuGroup(
-                    items =
-                        listOf(
-                            FlowMenuItemData(
-                                icon = { Icon(Icons.Outlined.ThumbDown, null, tint = MaterialTheme.colorScheme.error) },
-                                title = { Text(stringResource(R.string.not_interested), color = MaterialTheme.colorScheme.error) },
-                                description = { Text(stringResource(R.string.not_interested_desc)) },
-                                onClick = {
-                                    viewModel.notInterested(track)
-                                    android.widget.Toast
-                                        .makeText(
-                                            context,
-                                            context.getString(R.string.feedback_not_interested_applied, artistName),
-                                            android.widget.Toast.LENGTH_SHORT,
-                                        ).show()
-                                    onDismiss()
-                                },
-                            ),
-                            FlowMenuItemData(
-                                icon = { Icon(Icons.Outlined.Block, null, tint = MaterialTheme.colorScheme.error) },
-                                title = {
-                                    Text(
-                                        stringResource(R.string.dont_recommend_artist, artistName),
-                                        color = MaterialTheme.colorScheme.error,
-                                    )
-                                },
-                                description = { Text(stringResource(R.string.dont_recommend_artist_desc)) },
-                                onClick = {
-                                    viewModel.dontRecommendArtist(track)
-                                    android.widget.Toast
-                                        .makeText(
-                                            context,
-                                            context.getString(R.string.feedback_artist_blocked, artistName),
-                                            android.widget.Toast.LENGTH_SHORT,
-                                        ).show()
-                                    onDismiss()
-                                },
-                            ),
-                        ),
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
-            }
-
-            item { Spacer(modifier = Modifier.height(16.dp)) }
 
             // Info & Navigation Group
             item {

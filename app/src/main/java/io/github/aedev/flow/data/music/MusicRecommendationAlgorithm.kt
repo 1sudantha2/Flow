@@ -1,4 +1,4 @@
-package io.github.aedev.flow.data.recommendation
+package io.github.aedev.flow.data.music
 
 import android.content.Context
 import android.util.Log

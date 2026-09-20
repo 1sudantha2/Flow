@@ -41,8 +41,8 @@ import io.github.aedev.flow.data.download.DownloadUtil
 import io.github.aedev.flow.data.model.ParametricEQ
 import io.github.aedev.flow.data.music.YouTubeMusicService
 import io.github.aedev.flow.data.music.model.MusicTrack
+import io.github.aedev.flow.data.music.model.primaryArtistKey
 import io.github.aedev.flow.data.newmusic.InnertubeMusicService
-import io.github.aedev.flow.data.recommendation.music.MusicBrainEngine
 import io.github.aedev.flow.extensions.setOffloadEnabled
 import io.github.aedev.flow.innertube.YouTube
 import io.github.aedev.flow.innertube.models.WatchEndpoint
@@ -160,9 +160,6 @@ class Media3MusicService : MediaLibraryService() {
 
     @Inject
     lateinit var widgetPublisher: io.github.aedev.flow.widget.nowplaying.NowPlayingWidgetPublisher
-
-    @Inject
-    lateinit var musicBrain: MusicBrainEngine
 
     @OptIn(UnstableApi::class)
     override fun onCreate() {
@@ -340,8 +337,6 @@ class Media3MusicService : MediaLibraryService() {
                     mediaItem: androidx.media3.common.MediaItem?,
                     reason: Int,
                 ) {
-                    finalizeListenSession()
-                    startListenSession(mediaItem?.mediaId)
                     applyLoudnessGain()
 
                     if (
@@ -418,11 +413,6 @@ class Media3MusicService : MediaLibraryService() {
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     updateLocks(isPlaybackActive())
                     widgetPublisher.publish(player)
-                    if (playbackState == Player.STATE_ENDED || playbackState == Player.STATE_IDLE) {
-                        // ENDED: the queue ran out — no transition fires for the last track.
-                        // IDLE: player.stop() from a dismiss/stop path — same deal.
-                        finalizeListenSession()
-                    }
                     if (playbackState == Player.STATE_ENDED) {
                         // Radio raced the queue end: append now and keep playing.
                         maybeExtendRadio()
@@ -432,7 +422,6 @@ class Media3MusicService : MediaLibraryService() {
                         }
                     }
                     if (playbackState == Player.STATE_READY) {
-                        refreshLearnDuration()
                         applyLoudnessGain()
                         player.currentMediaItem?.mediaId?.let { mediaId ->
                             val lastErrorAt = lastPlaybackErrorAtMap[mediaId] ?: 0L
@@ -455,105 +444,9 @@ class Media3MusicService : MediaLibraryService() {
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
                     updateLocks(isPlaybackActive())
                     widgetPublisher.publish(player)
-                    if (isPlaying) {
-                        if (learnMediaId == null) learnMediaId = player.currentMediaItem?.mediaId
-                        if (learnTrack?.videoId != learnMediaId) learnTrack = resolveLearnTrack(learnMediaId)
-                        refreshLearnDuration()
-                        learnPlayingSinceMs = android.os.SystemClock.elapsedRealtime()
-                    } else {
-                        closePlayingSegment()
-                    }
                 }
             },
         )
-    }
-
-    // ── Listen-session accounting (feeds MusicBrainEngine) ──
-    // Hand-rolled instead of Media3's PlaybackStatsListener, whose internal state
-    // machine throws IllegalArgumentException on some transition orders (seen on
-    // device with our seekTo(0)-on-transition). Wall-clock time while isPlaying is
-    // pause-free and seek-immune; a repeat loop finalizes and restarts a session,
-    // so relistens still count once each.
-
-    private var learnMediaId: String? = null
-    private var learnTrack: MusicTrack? = null
-    private var learnGenre: String? = null
-    private var learnDurationMs = 0L
-    private var learnPlayedMs = 0L
-    private var learnPlayingSinceMs = -1L
-
-    private fun closePlayingSegment() {
-        if (learnPlayingSinceMs >= 0) {
-            learnPlayedMs += android.os.SystemClock.elapsedRealtime() - learnPlayingSinceMs
-            learnPlayingSinceMs = -1L
-        }
-    }
-
-    // Queue metadata often ships duration=0 (related/next payloads omit it), so the
-    // player's own duration — valid once READY — is the reliable denominator.
-    private fun refreshLearnDuration() {
-        if (!::player.isInitialized) return
-        if (player.currentMediaItem?.mediaId != learnMediaId) return
-        val d = player.duration
-        if (d > 0) learnDurationMs = d
-    }
-
-    private fun resolveLearnTrack(mediaId: String?): MusicTrack? {
-        if (mediaId.isNullOrBlank()) return null
-        val manager = io.github.aedev.flow.player.EnhancedMusicPlayerManager
-        return manager.queue.value.firstOrNull { it.videoId == mediaId }
-            ?: manager.currentTrack.value?.takeIf { it.videoId == mediaId }
-            ?: manager.automixItems.value.firstOrNull { it.videoId == mediaId }
-    }
-
-    private fun startListenSession(mediaId: String?) {
-        learnMediaId = mediaId
-        // Pin the track now: by finalize time a new playlist may have replaced the
-        // queue and the outgoing track would no longer resolve.
-        learnTrack = resolveLearnTrack(mediaId)
-        // Pin the genre context too — it belongs to the queue this track started in.
-        learnGenre =
-            io.github.aedev.flow.player.EnhancedMusicPlayerManager
-                .playContextGenre
-        learnDurationMs = 0L
-        learnPlayedMs = 0L
-        learnPlayingSinceMs =
-            if (::player.isInitialized && player.isPlaying) android.os.SystemClock.elapsedRealtime() else -1L
-        refreshLearnDuration()
-    }
-
-    private fun finalizeListenSession() {
-        closePlayingSegment()
-        val mediaId = learnMediaId
-        val pinnedTrack = learnTrack
-        val pinnedDurationMs = learnDurationMs
-        val playedMs = learnPlayedMs
-        val pinnedGenre = learnGenre
-        learnMediaId = null
-        learnTrack = null
-        learnGenre = null
-        learnDurationMs = 0L
-        learnPlayedMs = 0L
-        if (mediaId.isNullOrBlank() || playedMs <= 0) {
-            Log.d(TAG, "listen finalize skipped: id=$mediaId playedMs=$playedMs")
-            return
-        }
-
-        val track = pinnedTrack?.takeIf { it.videoId == mediaId } ?: resolveLearnTrack(mediaId)
-        if (track == null) {
-            Log.w(TAG, "listen finalize: no track match for $mediaId")
-            return
-        }
-        val durationMs = if (track.duration > 0) track.duration.toLong() * 1000 else pinnedDurationMs
-        if (durationMs <= 0) {
-            Log.w(TAG, "listen finalize: no duration for $mediaId")
-            return
-        }
-
-        Log.d(TAG, "listen finalize: $mediaId playedMs=$playedMs pct=${playedMs.toDouble() / durationMs}")
-        // Engine-scoped, NOT lifecycleScope: the finalize from onDestroy runs after
-        // this service's scope is already cancelled, and the session must still land.
-        musicBrain.onListenSessionAsync(track, playedMs.toDouble() / durationMs, pinnedGenre, playedMs)
     }
 
     /**
@@ -991,9 +884,6 @@ class Media3MusicService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
-        // Flush the in-flight listen session before the player goes away.
-        finalizeListenSession()
-
         // Clear audio session ID so external processors know we're gone
         currentAudioSessionId = 0
         Log.i(TAG, "Audio session destroyed")
@@ -1157,11 +1047,10 @@ class Media3MusicService : MediaLibraryService() {
                         radioEndpoint = page?.endpoint
                     }
 
-                    val ranked = musicBrain.rankTracks(mapped, "radio")
-                    Log.d(TAG, "Radio seeded from $seedId: ${ranked.size} tracks, continuation=${radioContinuation != null}")
-                    if (ranked.isNotEmpty()) {
+                    Log.d(TAG, "Radio seeded from $seedId: ${mapped.size} tracks, continuation=${radioContinuation != null}")
+                    if (mapped.isNotEmpty()) {
                         io.github.aedev.flow.player.EnhancedMusicPlayerManager
-                            .updateAutomixItems(ranked)
+                            .updateAutomixItems(mapped)
                         // The queue may already be short (or ended) by the time the
                         // seed arrives — move pool tracks into it right away.
                         withContext(Dispatchers.Main) { maybeExtendRadio() }
@@ -1202,14 +1091,33 @@ class Media3MusicService : MediaLibraryService() {
 
         val queueIds = manager.queue.value.mapTo(HashSet()) { it.videoId }
         // A wider candidate window than the batch gives the artist spread real
-        // alternatives; sequencing is seeded with the queue tail so the appended
+        // alternatives; the pick loop is seeded with the queue tail so the appended
         // batch never opens with the artist that just played (review feedback:
         // same artist back-to-back in a 10-track radio queue).
         val candidates =
             manager.automixItems.value
                 .filterNot { it.videoId in queueIds }
                 .take(RADIO_APPEND_BATCH * 2)
-        val batch = musicBrain.sequenceRadioBatch(candidates, manager.queue.value.lastOrNull(), RADIO_APPEND_BATCH)
+        val tailArtist = manager.queue.value.lastOrNull()?.primaryArtistKey()
+        val pickedIds = HashSet<String>()
+        val batch =
+            buildList {
+                var lastArtist = tailArtist
+                for (candidate in candidates) {
+                    if (size >= RADIO_APPEND_BATCH) break
+                    val artist = candidate.primaryArtistKey()
+                    // Keep the server's order but skip a same-artist run when a
+                    // different-artist alternative is still available.
+                    if (artist == lastArtist &&
+                        candidates.any { it.videoId !in queueIds && it.videoId !in pickedIds && it.primaryArtistKey() != artist }
+                    ) {
+                        continue
+                    }
+                    add(candidate)
+                    pickedIds.add(candidate.videoId)
+                    lastArtist = artist
+                }
+            }
         if (ended && batch.isNotEmpty() && !radioResumeWhenAppended) {
             radioResumeWhenAppended = true
             radioEndedItemCount = player.mediaItemCount
@@ -1257,10 +1165,9 @@ class Media3MusicService : MediaLibraryService() {
                         page.items
                             .mapNotNull { InnertubeMusicService.convertToMusicTrack(it) }
                             .distinctBy { it.videoId }
-                    val ranked = musicBrain.rankTracks(mapped, "radio")
-                    Log.d(TAG, "Radio pool topped up with ${ranked.size} tracks, continuation=${radioContinuation != null}")
-                    if (ranked.isNotEmpty()) {
-                        manager.appendAutomixItems(ranked)
+                    Log.d(TAG, "Radio pool topped up with ${mapped.size} tracks, continuation=${radioContinuation != null}")
+                    if (mapped.isNotEmpty()) {
+                        manager.appendAutomixItems(mapped)
                         // If the queue ended while this fetch was in flight, feed it
                         // now — no further transition will ever call maybeExtendRadio.
                         // Re-entry is safe: this job is still active, so a nested

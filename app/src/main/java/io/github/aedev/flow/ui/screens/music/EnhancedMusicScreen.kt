@@ -29,7 +29,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -82,37 +81,17 @@ fun EnhancedMusicScreen(
     val musicListState = rememberLazyListState()
     val quickPicksGridState = rememberLazyGridState()
 
-    // Planner-lite: the brain's maturity decides which sections lead the page —
-    // a cold brain has nothing personal to say, a mature one leads with taste.
+    // Stable section ordering: personal shelves lead, the rest follows in a
+    // per-session shuffle so the page does not read as a fixed wall.
     val sectionOrder =
-        remember(uiState.sessionSeed, uiState.brainMaturity) {
+        remember(uiState.sessionSeed) {
             val defaultOrder = HomeSectionType.entries
             val anchored =
-                when (uiState.brainMaturity) {
-                    "cold_start" -> {
-                        listOf(
-                            HomeSectionType.CHARTS,
-                            HomeSectionType.MOODS_AND_GENRES,
-                            HomeSectionType.NEW_RELEASES,
-                        )
-                    }
-
-                    "mature" -> {
-                        listOf(
-                            HomeSectionType.QUICK_PICKS,
-                            HomeSectionType.SIMILAR_TO,
-                            HomeSectionType.FROM_COMMUNITY,
-                        )
-                    }
-
-                    else -> {
-                        listOf(
-                            HomeSectionType.QUICK_PICKS,
-                            HomeSectionType.FROM_COMMUNITY,
-                            HomeSectionType.DAILY_DISCOVER,
-                        )
-                    }
-                }
+                listOf(
+                    HomeSectionType.QUICK_PICKS,
+                    HomeSectionType.FROM_COMMUNITY,
+                    HomeSectionType.DAILY_DISCOVER,
+                )
             val dynamicPool = defaultOrder - anchored
             anchored + dynamicPool.shuffled(Random(uiState.sessionSeed))
         }

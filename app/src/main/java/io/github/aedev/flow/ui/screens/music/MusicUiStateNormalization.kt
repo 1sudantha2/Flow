@@ -4,164 +4,7 @@ import io.github.aedev.flow.data.model.distinctByNonBlankKeyOrSelf
 import io.github.aedev.flow.data.music.model.ArtistDetails
 import io.github.aedev.flow.data.music.model.MusicPlaylist
 import io.github.aedev.flow.data.music.model.MusicTrack
-import io.github.aedev.flow.data.recommendation.MusicSection
-import io.github.aedev.flow.data.recommendation.music.isHiddenArtist
-import io.github.aedev.flow.data.recommendation.music.isHiddenAuthor
-
-/**
- * Applies "not interested"/"don't recommend" feedback to every recommendation
- * shelf in one place, so the filter can never miss a section. History, the
- * user's own playlists and explicitly opened artist pages stay untouched —
- * feedback shapes recommendations, it does not rewrite the user's records.
- */
-internal fun MusicUiState.withHiddenArtists(hidden: Set<String>): MusicUiState {
-    if (hidden.isEmpty()) return this
-
-    fun List<MusicTrack>.dropHidden(): List<MusicTrack> {
-        if (isEmpty()) return this
-        val filtered = filterNot { it.isHiddenArtist(hidden) }
-        return if (filtered.size == size) this else filtered
-    }
-
-    fun List<MusicSection>.dropHidden(minTracks: Int): List<MusicSection> {
-        var changed = false
-        val filtered =
-            mapNotNull { section ->
-                val tracks = section.tracks.dropHidden()
-                when {
-                    tracks === section.tracks -> {
-                        section
-                    }
-
-                    tracks.size < minTracks -> {
-                        changed = true
-                        null
-                    }
-
-                    else -> {
-                        changed = true
-                        section.copy(tracks = tracks)
-                    }
-                }
-            }
-        return if (changed) filtered else this
-    }
-
-    val filteredDailyDiscover =
-        dailyDiscover
-            .filterNot { it.recommendation.isHiddenArtist(hidden) }
-            .let { if (it.size == dailyDiscover.size) dailyDiscover else it }
-    val filteredTopAlbums =
-        topAlbums
-            .filterNot { it.isHiddenAuthor(hidden) }
-            .let { if (it.size == topAlbums.size) topAlbums else it }
-    val filteredFavoriteAlbums =
-        favoriteArtistAlbums
-            .filterNot { it.isHiddenAuthor(hidden) }
-            .let { if (it.size == favoriteArtistAlbums.size) favoriteArtistAlbums else it }
-    val filteredCommunity =
-        communityPlaylists
-            .mapNotNull { item ->
-                val tracks = item.tracks.dropHidden()
-                when {
-                    tracks === item.tracks -> item
-                    tracks.isEmpty() -> null
-                    else -> item.copy(tracks = tracks)
-                }
-            }.let { if (it == communityPlaylists) communityPlaylists else it }
-    val filteredGenreTracks = genreTracks.mapValuesIfChanged { it.dropHidden() }
-
-    val filteredOnRepeat = onRepeatTracks.dropHidden()
-    val filteredRediscover = rediscoverTracks.dropHidden()
-    val filteredDeepCuts = deepCutTracks.dropHidden()
-    val filteredArtistsForYou =
-        artistsForYou
-            .filterNot { it.isHiddenArtist(hidden) }
-            .let { if (it.size == artistsForYou.size) artistsForYou else it }
-    val filteredRotation = rotationTracks.dropHidden()
-    val filteredSpeedDial = speedDialTracks.dropHidden()
-    val filteredForYou = forYouTracks.dropHidden()
-    val filteredRecommended = recommendedTracks.dropHidden()
-    val filteredListenAgain = listenAgain.dropHidden()
-    val filteredTrending = trendingSongs.dropHidden()
-    val filteredChartArtists =
-        chartArtists
-            .filterNot { it.isHiddenArtist(hidden) }
-            .let { if (it.size == chartArtists.size) chartArtists else it }
-    val filteredNewReleases = newReleases.dropHidden()
-    val filteredMusicVideos = musicVideos.dropHidden()
-    val filteredMusicVideosForYou = musicVideosForYou.dropHidden()
-    val filteredLivePerformances = livePerformances.dropHidden()
-    val filteredLongListens = longListens.dropHidden()
-    val filteredAllSongs = allSongs.dropHidden()
-    val filteredDynamicSections = dynamicSections.dropHidden(minTracks = 1)
-    val filteredDailyMixSections = dailyMixSections.dropHidden(minTracks = 4)
-    val filteredSimilarSections = similarToSections.dropHidden(minTracks = 1)
-    val filteredOtherPerformanceSections = otherPerformanceSections.dropHidden(minTracks = 1)
-    val filteredMoreFromArtistSections = moreFromArtistSections.dropHidden(minTracks = 1)
-
-    if (
-        filteredDailyDiscover === dailyDiscover &&
-        filteredOnRepeat === onRepeatTracks &&
-        filteredRediscover === rediscoverTracks &&
-        filteredDeepCuts === deepCutTracks &&
-        filteredArtistsForYou === artistsForYou &&
-        filteredRotation === rotationTracks &&
-        filteredSpeedDial === speedDialTracks &&
-        filteredForYou === forYouTracks &&
-        filteredRecommended === recommendedTracks &&
-        filteredListenAgain === listenAgain &&
-        filteredTrending === trendingSongs &&
-        filteredChartArtists === chartArtists &&
-        filteredNewReleases === newReleases &&
-        filteredMusicVideos === musicVideos &&
-        filteredMusicVideosForYou === musicVideosForYou &&
-        filteredLivePerformances === livePerformances &&
-        filteredLongListens === longListens &&
-        filteredAllSongs === allSongs &&
-        filteredTopAlbums === topAlbums &&
-        filteredFavoriteAlbums === favoriteArtistAlbums &&
-        filteredCommunity === communityPlaylists &&
-        filteredGenreTracks === genreTracks &&
-        filteredDynamicSections === dynamicSections &&
-        filteredDailyMixSections === dailyMixSections &&
-        filteredSimilarSections === similarToSections &&
-        filteredOtherPerformanceSections === otherPerformanceSections &&
-        filteredMoreFromArtistSections === moreFromArtistSections
-    ) {
-        return this
-    }
-
-    return copy(
-        dailyDiscover = filteredDailyDiscover,
-        onRepeatTracks = filteredOnRepeat,
-        rediscoverTracks = filteredRediscover,
-        deepCutTracks = filteredDeepCuts,
-        artistsForYou = filteredArtistsForYou,
-        rotationTracks = filteredRotation,
-        speedDialTracks = filteredSpeedDial,
-        forYouTracks = filteredForYou,
-        recommendedTracks = filteredRecommended,
-        listenAgain = filteredListenAgain,
-        trendingSongs = filteredTrending,
-        chartArtists = filteredChartArtists,
-        newReleases = filteredNewReleases,
-        musicVideos = filteredMusicVideos,
-        musicVideosForYou = filteredMusicVideosForYou,
-        livePerformances = filteredLivePerformances,
-        longListens = filteredLongListens,
-        allSongs = filteredAllSongs,
-        topAlbums = filteredTopAlbums,
-        favoriteArtistAlbums = filteredFavoriteAlbums,
-        communityPlaylists = filteredCommunity,
-        genreTracks = filteredGenreTracks,
-        dynamicSections = filteredDynamicSections,
-        dailyMixSections = filteredDailyMixSections,
-        similarToSections = filteredSimilarSections,
-        otherPerformanceSections = filteredOtherPerformanceSections,
-        moreFromArtistSections = filteredMoreFromArtistSections,
-    )
-}
+import io.github.aedev.flow.data.music.MusicSection
 
 internal fun MusicUiState.withUniqueLazyContent(): MusicUiState {
     val uniqueDailyDiscover =
@@ -169,8 +12,6 @@ internal fun MusicUiState.withUniqueLazyContent(): MusicUiState {
             it.recommendation.videoId
         }
     val uniqueForYou = forYouTracks.uniqueMusicTracks()
-    val uniqueDeepCuts = deepCutTracks.uniqueMusicTracks()
-    val uniqueArtistsForYou = artistsForYou.distinctByNonBlankKeyOrSelf(ArtistDetails::channelId)
     val uniqueRecommended = recommendedTracks.uniqueMusicTracks()
     val uniqueListenAgain = listenAgain.uniqueMusicTracks()
     val uniqueTrending = trendingSongs.uniqueMusicTracks()
@@ -189,9 +30,7 @@ internal fun MusicUiState.withUniqueLazyContent(): MusicUiState {
         }
     val uniqueFeaturedPlaylists = featuredPlaylists.uniqueMusicPlaylists()
     val uniqueTopAlbums = topAlbums.uniqueMusicPlaylists()
-    val uniqueFavoriteArtistAlbums = favoriteArtistAlbums.uniqueMusicPlaylists()
     val uniqueDynamicSections = dynamicSections.uniqueSectionTracks()
-    val uniqueDailyMixSections = dailyMixSections.uniqueSectionTracks()
     val uniqueSimilarSections = similarToSections.uniqueSectionTracks()
     val uniqueOtherPerformanceSections = otherPerformanceSections.uniqueSectionTracks()
     val uniqueMoreFromArtistSections = moreFromArtistSections.uniqueSectionTracks()
@@ -209,8 +48,6 @@ internal fun MusicUiState.withUniqueLazyContent(): MusicUiState {
     if (
         uniqueDailyDiscover === dailyDiscover &&
         uniqueForYou === forYouTracks &&
-        uniqueDeepCuts === deepCutTracks &&
-        uniqueArtistsForYou === artistsForYou &&
         uniqueRecommended === recommendedTracks &&
         uniqueListenAgain === listenAgain &&
         uniqueTrending === trendingSongs &&
@@ -226,9 +63,7 @@ internal fun MusicUiState.withUniqueLazyContent(): MusicUiState {
         uniqueCommunityPlaylists === communityPlaylists &&
         uniqueFeaturedPlaylists === featuredPlaylists &&
         uniqueTopAlbums === topAlbums &&
-        uniqueFavoriteArtistAlbums === favoriteArtistAlbums &&
         uniqueDynamicSections === dynamicSections &&
-        uniqueDailyMixSections === dailyMixSections &&
         uniqueSimilarSections === similarToSections &&
         uniqueOtherPerformanceSections === otherPerformanceSections &&
         uniqueMoreFromArtistSections === moreFromArtistSections &&
@@ -243,8 +78,6 @@ internal fun MusicUiState.withUniqueLazyContent(): MusicUiState {
     return copy(
         dailyDiscover = uniqueDailyDiscover,
         forYouTracks = uniqueForYou,
-        deepCutTracks = uniqueDeepCuts,
-        artistsForYou = uniqueArtistsForYou,
         recommendedTracks = uniqueRecommended,
         listenAgain = uniqueListenAgain,
         trendingSongs = uniqueTrending,
@@ -261,9 +94,7 @@ internal fun MusicUiState.withUniqueLazyContent(): MusicUiState {
         genreTracks = uniqueGenreTracks,
         featuredPlaylists = uniqueFeaturedPlaylists,
         topAlbums = uniqueTopAlbums,
-        favoriteArtistAlbums = uniqueFavoriteArtistAlbums,
         dynamicSections = uniqueDynamicSections,
-        dailyMixSections = uniqueDailyMixSections,
         homeChips = uniqueHomeChips,
         artistDetails = uniqueArtistDetails,
         searchResultsArtists = uniqueSearchArtists,

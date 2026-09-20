@@ -23,16 +23,12 @@ import io.github.aedev.flow.data.music.PlaylistRepository
 import io.github.aedev.flow.data.music.YouTubeMusicService
 import io.github.aedev.flow.data.music.model.MUSIC_GENRE_SOURCE_PREFIX
 import io.github.aedev.flow.data.music.model.MusicTrack
-import io.github.aedev.flow.data.recommendation.music.MusicBrainEngine
 import io.github.aedev.flow.player.EnhancedMusicPlayerManager
 import io.github.aedev.flow.player.RepeatMode
 import io.github.aedev.flow.utils.PerformanceDispatcher
-import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -54,7 +50,6 @@ class MusicPlayerViewModel
         private val likedVideosRepository: LikedVideosRepository,
         private val viewHistory: ViewHistory,
         private val localPlaylistRepository: io.github.aedev.flow.data.local.PlaylistRepository,
-        private val musicBrain: MusicBrainEngine,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow(MusicPlayerUiState())
         val uiState: StateFlow<MusicPlayerUiState> = _uiState.asStateFlow()
@@ -565,36 +560,9 @@ class MusicPlayerViewModel
                             isMusic = true,
                         ),
                     )
-                    musicBrain.onExplicitLike(currentTrack)
                 } else {
                     likedVideosRepository.removeLikeState(currentTrack.videoId)
                 }
-            }
-        }
-
-        /**
-         * "Not interested": soft-suppresses the track's artist for two weeks. A
-         * second one while still suppressed escalates to a permanent block —
-         * mirrored from the desktop two-layer feedback system.
-         */
-        fun notInterested(track: MusicTrack) {
-            val primary = track.artists.firstOrNull()
-            viewModelScope.launch(PerformanceDispatcher.diskIO) {
-                musicBrain.dislikeArtist(
-                    primary?.id ?: track.channelId.takeIf { it.isNotBlank() },
-                    primary?.name ?: track.artist,
-                )
-            }
-        }
-
-        /** "Don't recommend {artist}": an immediate permanent hard block, reversible in settings. */
-        fun dontRecommendArtist(track: MusicTrack) {
-            val primary = track.artists.firstOrNull()
-            viewModelScope.launch(PerformanceDispatcher.diskIO) {
-                musicBrain.blockArtist(
-                    primary?.id ?: track.channelId.takeIf { it.isNotBlank() },
-                    primary?.name ?: track.artist,
-                )
             }
         }
 
