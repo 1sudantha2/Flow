@@ -42,7 +42,6 @@ import io.github.aedev.flow.ui.screens.music.MusicViewModel
 import io.github.aedev.flow.ui.screens.music.sharedMusicPlayerViewModel
 import io.github.aedev.flow.ui.screens.notifications.NotificationScreen
 import io.github.aedev.flow.ui.screens.onboarding.OnboardingScreen
-import io.github.aedev.flow.ui.screens.personality.FlowPersonalityScreen
 import io.github.aedev.flow.ui.screens.player.VideoPlayerViewModel
 import io.github.aedev.flow.ui.screens.player.state.VideoPlayerUiState
 import io.github.aedev.flow.ui.screens.playlists.PlaylistDetailScreen
@@ -363,7 +362,7 @@ fun NavGraphBuilder.flowAppGraph(
             onNavigateToAppearance = { navController.navigate("settings/appearance") },
             onNavigateToPlayerAppearance = { navController.navigate("settings/player_appearance") },
             onNavigateToDonations = { navController.navigate("donations") },
-            onNavigateToPersonality = { navController.navigate("personality") },
+            onNavigateToAccount = { navController.navigate("settings/account") },
             onNavigateToDownloads = { navController.navigate("settings/downloads") },
             onNavigateToTimeManagement = { navController.navigate("settings/time_management") },
             onNavigateToImport = { navController.navigate("settings/import") },
@@ -592,11 +591,21 @@ fun NavGraphBuilder.flowAppGraph(
         )
     }
 
-    composable("personality") {
-        currentRoute.value = "personality"
+    composable("settings/account") {
+        currentRoute.value = "settings/account"
         showBottomNav.value = false
-        FlowPersonalityScreen(
+        io.github.aedev.flow.ui.screens.account.AccountScreen(
             onNavigateBack = { navController.popBackStack() },
+            onNavigateToLogin = { navController.navigate("settings/account/login") },
+        )
+    }
+
+    composable("settings/account/login") {
+        currentRoute.value = "settings/account/login"
+        showBottomNav.value = false
+        io.github.aedev.flow.ui.screens.account.LoginScreen(
+            onNavigateBack = { navController.popBackStack() },
+            onLoginComplete = { navController.popBackStack() },
         )
     }
 

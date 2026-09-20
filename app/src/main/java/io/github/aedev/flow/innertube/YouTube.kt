@@ -48,6 +48,7 @@ import io.github.aedev.flow.innertube.pages.BrowseResult
 import io.github.aedev.flow.innertube.pages.ChartsPage
 import io.github.aedev.flow.innertube.pages.ExplorePage
 import io.github.aedev.flow.innertube.pages.HistoryPage
+import io.github.aedev.flow.innertube.pages.HomeFeedPage
 import io.github.aedev.flow.innertube.pages.HomePage
 import io.github.aedev.flow.innertube.pages.LibraryContinuationPage
 import io.github.aedev.flow.innertube.pages.LibraryPage
@@ -67,6 +68,7 @@ import io.github.aedev.flow.innertube.pages.SearchSummaryPage
 import io.github.aedev.flow.innertube.pages.ShortsPage
 import io.github.aedev.flow.innertube.pages.VideoCommentsPage
 import io.github.aedev.flow.innertube.pages.VideoDescriptionPage
+import io.github.aedev.flow.innertube.pages.toHomeFeedPage
 import io.github.aedev.flow.innertube.pages.channel.ChannelAbout
 import io.github.aedev.flow.innertube.pages.channel.ChannelHeader
 import io.github.aedev.flow.innertube.pages.channel.ChannelPage
@@ -2980,6 +2982,16 @@ object YouTube {
                 .header
                 ?.activeAccountHeaderRenderer
                 ?.toAccountInfo()!!
+        }
+
+    /**
+     * The main-site home feed — YouTube's own recommendation feed, personalized for the signed-in
+     * account when a session exists. Paging walks the continuation tokens.
+     */
+    suspend fun homeFeed(continuation: String? = null): Result<HomeFeedPage> =
+        runCatching {
+            val body = innerTube.mainSiteHomeFeed(continuation).bodyAsText()
+            Json.parseToJsonElement(body).toHomeFeedPage()
         }
 
     suspend fun getMediaInfo(videoId: String): Result<MediaInfo> =

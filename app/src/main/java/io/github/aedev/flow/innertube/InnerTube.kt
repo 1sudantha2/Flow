@@ -638,6 +638,54 @@ class InnerTube {
         }
     }
 
+    /**
+     * The main-site home feed (`FEwhat_to_watch`) — YouTube's own recommendation feed for the
+     * signed-in account (a generic feed when logged out), served from www.youtube.com with the
+     * WEB client.
+     *
+     * When an account session exists the cookie header and the SAPISIDHASH Authorization header
+     * are attached, which is what makes the feed carry the account's own recommendations.
+     */
+    suspend fun mainSiteHomeFeed(continuation: String? = null) = withRetry {
+        withVisitorDataFallback { requestVisitorData ->
+            httpClient.post("${YouTubeClient.API_URL_YOUTUBE}browse") {
+                headers {
+                    append("X-Goog-Api-Format-Version", "1")
+                    append("X-YouTube-Client-Name", YouTubeClient.WEB.clientId)
+                    append("X-YouTube-Client-Version", YouTubeClient.WEB.clientVersion)
+                    append("X-Origin", YouTubeClient.ORIGIN_YOUTUBE)
+                    append("Referer", YouTubeClient.REFERER_YOUTUBE)
+                    requestVisitorData?.let { append("X-Goog-Visitor-Id", it) }
+                    if (useLoginForBrowse) {
+                        cookie?.let { cookieValue ->
+                            append("cookie", cookieValue)
+                            if ("SAPISID" in cookieMap) {
+                                val currentTime = System.currentTimeMillis() / 1000
+                                val sapisidHash = sha1("$currentTime ${cookieMap["SAPISID"]} ${YouTubeClient.ORIGIN_YOUTUBE}")
+                                append("Authorization", "SAPISIDHASH ${currentTime}_$sapisidHash")
+                            }
+                        }
+                    }
+                }
+                contentType(ContentType.Application.Json)
+                userAgent(YouTubeClient.WEB.userAgent)
+                parameter("prettyPrint", false)
+                setBody(
+                    BrowseBody(
+                        context =
+                            YouTubeClient.WEB.toContext(
+                                locale,
+                                requestVisitorData,
+                                if (useLoginForBrowse) dataSyncId else null,
+                            ),
+                        browseId = if (continuation == null) "FEwhat_to_watch" else null,
+                        continuation = continuation,
+                    ),
+                )
+            }
+        }
+    }
+
     suspend fun reel(
         client: YouTubeClient,
         params: String? = null,
@@ -646,14 +694,17 @@ class InnerTube {
     ) = withRetry {
         httpClient
             .post("reel/reel_watch_sequence") {
-                ytClient(client, setLogin = setLogin)
+                // Logged-in shorts: the personalized reel feed is only served to the account's
+                // session, so reel honours the global login switch like browse() does.
+                val login = setLogin || useLoginForBrowse
+                ytClient(client, setLogin = login)
                 setBody(
                     ReelBody(
                         context =
                             client.toContext(
                                 locale,
                                 visitorData,
-                                if (setLogin) dataSyncId else null,
+                                if (login) dataSyncId else null,
                             ),
                         params = params,
                         sequenceParams = sequenceParams,

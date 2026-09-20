@@ -585,6 +585,17 @@
     <string name="settings_header_data_management">Data Management</string>
     <string name="settings_header_about">About</string>
     <string name="settings_header_notifications">Notifications</string>
+    <string name="account_title">Account</string>
+    <string name="account_description">When you sign in, every feed in Flow — video recommendations, YouTube Music and Shorts — is fetched with your account&apos;s YouTube session, so you get the recommendations YouTube builds for you. Your sign-in stays on this device; only YouTube itself sees the session.</string>
+    <string name="account_sign_in">Sign in with Google</string>
+    <string name="account_sign_out">Sign out</string>
+    <string name="account_signed_in">Signed in</string>
+    <string name="account_not_signed_in">You are not signed in</string>
+    <string name="account_not_signed_in_hint">Sign in to load your home feed, music and Shorts from your YouTube account. Anonymous access can also be throttled by YouTube; a signed-in session keeps playback and feeds working.</string>
+    <string name="account_sign_in_error">Sign-in could not be completed. Please try again.</string>
+    <string name="settings_item_account">Account</string>
+    <string name="settings_item_account_subtitle">Sign in with your Google account</string>
+    <string name="settings_item_account_signed_in_subtitle">Signed in as %1$s</string>
     <string name="settings_item_notifications">Notification Preferences</string>
     <string name="settings_item_notifications_subtitle">Control which notifications Flow can send</string>
     <string name="notif_settings_title">Notification Preferences</string>

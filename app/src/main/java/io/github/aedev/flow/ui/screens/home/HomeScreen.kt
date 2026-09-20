@@ -45,17 +45,14 @@ import io.github.aedev.flow.ui.TabScrollEventBus
 import io.github.aedev.flow.ui.components.layout.topbar.FlowTopBar
 import io.github.aedev.flow.ui.components.shared.FlowErrorState
 import io.github.aedev.flow.ui.components.shared.FlowPullToRefreshBox
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 
-private const val IMPRESSION_DEBOUNCE_MS = 500L
 private const val MILLIS_PER_SECOND = 1000L
 
-@OptIn(ExperimentalMaterial3Api::class, FlowPreview::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onVideoClick: (Video) -> Unit,
@@ -110,13 +107,6 @@ fun HomeScreen(
             .collect { (lastVisibleVideoIndex, _) ->
                 viewModel.onHomeViewportChanged(lastVisibleVideoIndex)
             }
-    }
-
-    // Viewport impressions: only items dwelt in view are recorded as "shown".
-    LaunchedEffect(gridState) {
-        snapshotFlow { gridState.layoutInfo.visibleItemsInfo.mapNotNull { it.key as? String } }
-            .debounce(IMPRESSION_DEBOUNCE_MS)
-            .collect { viewModel.recordImpressions(it) }
     }
 
     LaunchedEffect(refreshHomeOnReselect) {

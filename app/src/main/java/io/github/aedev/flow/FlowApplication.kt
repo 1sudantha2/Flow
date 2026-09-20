@@ -21,6 +21,7 @@ import io.github.aedev.flow.innertube.pages.NewPipeExtractor
 import io.github.aedev.flow.network.AppProxyManager
 import io.github.aedev.flow.notification.NotificationHelper
 import io.github.aedev.flow.notification.SubscriptionCheckWorker
+import io.github.aedev.flow.utils.AccountManager
 import io.github.aedev.flow.utils.AppLanguageManager
 import io.github.aedev.flow.utils.FlowCrashHandler
 import io.github.aedev.flow.utils.PerformanceDispatcher
@@ -79,6 +80,10 @@ class FlowApplication :
         super.onCreate()
         appContext = applicationContext
         YouTube.cacheDirectory = cacheDir.resolve("innertube_http_cache")
+
+        // Restore the signed-in Google account before any feed loads, so home, music and
+        // shorts requests are made with the account's session from the first fetch.
+        AccountManager.restore(this)
 
         DiscordPresenceRuntime.initialize(this, okHttpClient)
 

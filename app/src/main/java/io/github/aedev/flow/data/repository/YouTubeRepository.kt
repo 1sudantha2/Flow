@@ -17,6 +17,7 @@ import io.github.aedev.flow.innertube.models.response.VideoChaptersParser
 import io.github.aedev.flow.innertube.models.response.VideoHeatmap
 import io.github.aedev.flow.innertube.models.response.VideoHeatmapParser
 import io.github.aedev.flow.innertube.models.response.WatchMetadataResponse
+import io.github.aedev.flow.innertube.pages.HomeFeedPage
 import io.github.aedev.flow.innertube.pages.VideoDescriptionPage
 import io.github.aedev.flow.player.stream.InFlightRequestCoalescer
 import io.github.aedev.flow.utils.PerformanceDispatcher
@@ -302,6 +303,12 @@ class YouTubeRepository
                     Pair(emptyList(), null)
                 }
             }
+
+        /**
+         * The main-site YouTube home feed (`FEwhat_to_watch`) — YouTube's own recommendation
+         * feed, personalized for the signed-in account when a session exists.
+         */
+        suspend fun homeFeed(continuation: String? = null): Result<HomeFeedPage> = YouTube.homeFeed(continuation)
 
         /**
          * Search for videos

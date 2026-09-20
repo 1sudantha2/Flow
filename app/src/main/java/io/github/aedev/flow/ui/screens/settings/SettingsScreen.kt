@@ -3,25 +3,13 @@ package io.github.aedev.flow.ui.screens.settings
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.material3.Surface
@@ -29,22 +17,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.gson.JsonParser
 import io.github.aedev.flow.BuildConfig
@@ -52,8 +30,6 @@ import io.github.aedev.flow.R
 import io.github.aedev.flow.data.local.AppUiModePreferences
 import io.github.aedev.flow.data.local.DEEP_FLOW_NEVER_EXPIRES_HOURS
 import io.github.aedev.flow.data.local.PlayerPreferences
-import io.github.aedev.flow.data.recommendation.FlowNeuroEngine
-import io.github.aedev.flow.data.recommendation.UserBrain
 import io.github.aedev.flow.discord.DiscordPresenceRuntime
 import io.github.aedev.flow.network.AppProxyManager
 import io.github.aedev.flow.platform.AppUiMode
@@ -61,7 +37,7 @@ import io.github.aedev.flow.player.DeepFlowManager
 import io.github.aedev.flow.ui.components.layout.topbar.FlowSearchTopBar
 import io.github.aedev.flow.ui.components.layout.topbar.FlowTopBar
 import io.github.aedev.flow.ui.theme.ThemeMode
-import io.github.aedev.flow.ui.theme.extendedColors
+import io.github.aedev.flow.utils.AccountManager
 import io.github.aedev.flow.utils.AppLanguageManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -77,7 +53,7 @@ fun SettingsScreen(
     onNavigateToAppearance: () -> Unit,
     onNavigateToPlayerAppearance: () -> Unit,
     onNavigateToDonations: () -> Unit,
-    onNavigateToPersonality: () -> Unit,
+    onNavigateToAccount: () -> Unit,
     onNavigateToDownloads: () -> Unit,
     onNavigateToTimeManagement: () -> Unit,
     onNavigateToImport: () -> Unit,
@@ -113,17 +89,8 @@ fun SettingsScreen(
                 .BackupRepository(context)
         }
 
-    // Brain State
-    var userBrain by remember { mutableStateOf<UserBrain?>(null) }
-    var refreshBrainTrigger by remember { mutableStateOf(0) }
-
-    LaunchedEffect(refreshBrainTrigger) {
-        userBrain = FlowNeuroEngine.getBrainSnapshot()
-    }
-
     var showRegionDialog by remember { mutableStateOf(false) }
     var showAppLanguageDialog by remember { mutableStateOf(false) }
-    var showResetBrainDialog by remember { mutableStateOf(false) }
     // Update checker state (github flavor only)
     var isCheckingUpdate by remember { mutableStateOf(false) }
     // null = no dialog; non-null = tag string of the available update
@@ -263,7 +230,7 @@ fun SettingsScreen(
     }
 
     // Section label strings for the search index
-    val secFlowEngine = stringResource(R.string.settings_flow_engine_header)
+    val secAccount = stringResource(R.string.account_title)
     val secAppearance = stringResource(R.string.settings_header_appearance)
     val secContentPlayback = stringResource(R.string.settings_header_content_playback)
     val secNotifications = stringResource(R.string.settings_header_notifications)
@@ -273,11 +240,11 @@ fun SettingsScreen(
     val allSettingsEntries =
         listOf(
             SettingSearchEntry(
-                Icons.Outlined.Psychology,
-                stringResource(R.string.flow_control_center),
-                stringResource(R.string.neural_interest_map_subtitle),
-                secFlowEngine,
-                onNavigateToPersonality,
+                Icons.Outlined.AccountCircle,
+                stringResource(R.string.account_title),
+                stringResource(R.string.settings_item_account_subtitle),
+                secAccount,
+                onNavigateToAccount,
             ),
             SettingSearchEntry(
                 Icons.Outlined.Palette,
@@ -567,178 +534,23 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 // =================================================
-// 🧠 MY FLOW PERSONALITY (FLOW EXCLUSIVE FEATURE)
+// ACCOUNT
 // =================================================
                 item {
-                    Text(
-                        text = stringResource(R.string.settings_flow_engine_header),
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = 16.dp, bottom = 8.dp, top = 16.dp),
-                    )
-                }
+                    val accountSession by AccountManager.session.collectAsStateWithLifecycle()
+                    val accountSubtitle =
+                        accountSession?.email
+                            ?.let { stringResource(R.string.settings_item_account_signed_in_subtitle, it) }
+                            ?: stringResource(R.string.settings_item_account_subtitle)
 
-                item {
-                    val persona = if (userBrain != null) FlowNeuroEngine.getPersona(userBrain!!) else null
-
-                    Card(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp)
-                                .clickable(onClick = onNavigateToPersonality),
-                        shape = RoundedCornerShape(24.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                    ) {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = 180.dp),
-                        ) {
-                            // 1. Background Layer (Gradient)
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .matchParentSize()
-                                        .background(
-                                            brush =
-                                                Brush.linearGradient(
-                                                    colors =
-                                                        listOf(
-                                                            MaterialTheme.colorScheme.primary,
-                                                            MaterialTheme.colorScheme.primaryContainer,
-                                                        ),
-                                                ),
-                                        ),
-                            )
-                            // 2. Background Decor (Abstract Shapes)
-                            Canvas(modifier = Modifier.matchParentSize()) {
-                                // Top Right Circle
-                                drawCircle(
-                                    color = Color.White.copy(alpha = 0.1f),
-                                    radius = size.width * 0.5f,
-                                    center = Offset(size.width, 0f),
-                                )
-                                // Bottom Left Blob
-                                drawCircle(
-                                    color = Color.Black.copy(alpha = 0.05f),
-                                    radius = size.width * 0.3f,
-                                    center = Offset(0f, size.height),
-                                )
-                            }
-
-                            // 2. Huge Emoji Icon (Watermark style)
-                            if (persona != null) {
-                                Text(
-                                    text = persona.icon, // e.g., 🤿 or 🧭
-                                    fontSize = 120.sp,
-                                    modifier =
-                                        Modifier
-                                            .align(Alignment.BottomEnd)
-                                            .offset(x = 20.dp, y = 20.dp)
-                                            .alpha(0.15f),
-                                )
-                            }
-
-                            // 4. Main Content
-                            Column(
-                                modifier =
-                                    Modifier
-                                        .fillMaxSize()
-                                        .padding(20.dp),
-                                verticalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                // Header Row
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.Top,
-                                ) {
-                                    // Badge
-                                    Surface(
-                                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.2f),
-                                        shape = RoundedCornerShape(8.dp),
-                                    ) {
-                                        Text(
-                                            text = stringResource(R.string.settings_active_learning),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onPrimary,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        )
-                                    }
-
-                                    // Reset Button (Subtle)
-                                    IconButton(
-                                        onClick = { showResetBrainDialog = true },
-                                        modifier =
-                                            Modifier
-                                                .size(32.dp)
-                                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.2f), CircleShape),
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Refresh,
-                                            contentDescription = stringResource(R.string.settings_reset_everything),
-                                            tint = MaterialTheme.colorScheme.onPrimary,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    }
-                                }
-
-                                // Persona Info
-                                if (persona != null) {
-                                    Column {
-                                        Text(
-                                            text = stringResource(persona.titleRes),
-                                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
-                                            color = MaterialTheme.colorScheme.onPrimary,
-                                        )
-                                        Spacer(Modifier.height(4.dp))
-                                        Text(
-                                            text = stringResource(persona.descriptionRes),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
-                                } else {
-                                    // Loading State
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        CircularProgressIndicator(
-                                            color = MaterialTheme.colorScheme.onPrimary,
-                                            modifier = Modifier.size(24.dp),
-                                            strokeWidth = 2.dp,
-                                        )
-                                        Spacer(Modifier.width(12.dp))
-                                        Text(
-                                            text = stringResource(R.string.settings_analyzing_interactions),
-                                            color = MaterialTheme.colorScheme.onPrimary,
-                                        )
-                                    }
-                                }
-
-                                // Bottom CTA
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(
-                                        text = stringResource(R.string.settings_view_analytics),
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = MaterialTheme.colorScheme.onPrimary,
-                                        fontWeight = FontWeight.Bold,
-                                    )
-                                    Spacer(Modifier.width(4.dp))
-                                    Icon(
-                                        Icons.Default.ArrowForward,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                }
-                            }
-                        }
+                    SectionHeader(text = stringResource(R.string.account_title))
+                    SettingsGroup {
+                        SettingsItem(
+                            icon = Icons.Outlined.AccountCircle,
+                            title = stringResource(R.string.account_title),
+                            subtitle = accountSubtitle,
+                            onClick = onNavigateToAccount,
+                        )
                     }
                 }
                 // DEEP FLOW MODE
@@ -1327,35 +1139,6 @@ fun SettingsScreen(
                 TextButton(onClick = { showDeepFlowDurationDialog = false }) {
                     Text(stringResource(R.string.cancel))
                 }
-            },
-        )
-    }
-
-    if (showResetBrainDialog) {
-        AlertDialog(
-            onDismissRequest = { showResetBrainDialog = false },
-            icon = { Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error) },
-            title = { Text(stringResource(R.string.settings_reset_brain_title)) },
-            text = {
-                Text(
-                    stringResource(R.string.settings_reset_brain_body),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        coroutineScope.launch {
-                            FlowNeuroEngine.resetBrain(context)
-                            refreshBrainTrigger++
-                            showResetBrainDialog = false
-                        }
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                ) { Text(stringResource(R.string.settings_reset_everything)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showResetBrainDialog = false }) { Text(stringResource(R.string.cancel)) }
             },
         )
     }

@@ -96,9 +96,3 @@ internal class HomePrefetchQueue(
             null
         }
 }
-
-/** Keeps only visible grid keys that map to real feed videos (drops shelf/loader keys). */
-internal fun feedImpressionIds(
-    visibleKeys: List<String>,
-    knownIds: Set<String>,
-): List<String> = visibleKeys.filter { it in knownIds }
