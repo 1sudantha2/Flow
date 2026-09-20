@@ -2,22 +2,13 @@ package io.github.aedev.flow.ui.screens.shorts
 
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
-import android.util.Log
-import android.view.SurfaceHolder
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.AudioFile
@@ -25,6 +16,16 @@ import androidx.compose.material.icons.outlined.HighQuality
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AudioFile
+import androidx.compose.material.icons.outlined.HighQuality
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -319,9 +320,6 @@ internal fun ShortVideoPage(
                 (latestHasStartedPlaying || latestPosition >= 1_000L)
             ) {
                 viewModel.recordShortProgress(video.toShortVideo(), latestPosition, latestDuration)
-                // Swiped away before the terminal watch fired — classify the
-                // abandonment so early swipes become negative engine evidence.
-                viewModel.recordShortAbandoned(video.toShortVideo(), latestPosition, latestDuration)
             }
         }
     }
@@ -1053,11 +1051,6 @@ internal fun ShortVideoPage(
         if (pageState.showShortsOptionsSheet) {
             ShortsOptionsSheet(
                 isLoadingStreams = pageState.isLoadingStreams,
-                onWantMore = {
-                    pageState.showShortsOptionsSheet = false
-                    actions.onWantMore()
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                },
                 onNotInterested = {
                     pageState.showShortsOptionsSheet = false
                     actions.onNotInterested()
@@ -1243,7 +1236,6 @@ internal fun ShortVideoPage(
 @Composable
 private fun ShortsOptionsSheet(
     isLoadingStreams: Boolean,
-    onWantMore: () -> Unit,
     onNotInterested: () -> Unit,
     onDislikeClick: () -> Unit = {},
     ambientModeEnabled: Boolean,
@@ -1301,131 +1293,7 @@ private fun ShortsOptionsSheet(
                     )
                 }
             }
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
-            Surface(
-                onClick = onWantMore,
-                color = Color.Transparent,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.ThumbUp,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = stringResource(R.string.action_want_more),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
-
-            Surface(
-                onClick = onNotInterested,
-                color = Color.Transparent,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.NotInterested,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = stringResource(R.string.action_not_interested),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
-
-            Surface(
-                onClick = {
-                    onDismiss()
-                    onDislikeClick()
-                },
-                color = Color.Transparent,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.ThumbDown,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = stringResource(R.string.action_dislike),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
-
-            // ── Download ──
-            Surface(
-                onClick = onDownloadClick,
-                color = Color.Transparent,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !isLoadingStreams,
-            ) {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Download,
-                        contentDescription = null,
-                        tint =
-                            if (isLoadingStreams) {
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                    )
-                    Text(
-                        text = stringResource(R.string.download_video),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color =
-                            if (isLoadingStreams) {
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                    )
-                    if (isLoadingStreams) {
-                        Spacer(Modifier.weight(1f))
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    }
-                }
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
+HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
             Surface(
                 onClick = onAudioTrackClick,
                 color = Color.Transparent,

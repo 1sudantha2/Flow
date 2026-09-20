@@ -15,10 +15,7 @@ import io.github.aedev.flow.data.local.ViewHistory
 import io.github.aedev.flow.data.model.Comment
 import io.github.aedev.flow.data.model.ShortVideo
 import io.github.aedev.flow.data.model.toVideo
-import io.github.aedev.flow.data.recommendation.FlowNeuroEngine
-import io.github.aedev.flow.data.recommendation.InteractionType
 import io.github.aedev.flow.data.repository.YouTubeRepository
-import io.github.aedev.flow.data.shorts.ShortWatchClassifier
 import io.github.aedev.flow.data.shorts.ShortsRepository
 import io.github.aedev.flow.data.shorts.queue.ShortsQueueChange
 import io.github.aedev.flow.data.shorts.queue.ShortsQueueController
@@ -105,13 +102,6 @@ class ShortsViewModel
                 }
             }
 
-            // Append discovery-ranked items when background discovery finishes after the InnerTube
-            // fast path. Interleaving after the current position is the controller's job.
-            viewModelScope.launch {
-                shortsRepository.discoveryFeedUpdate.collect { newShorts ->
-                    if (queue?.mergeDiscovery(newShorts) != ShortsQueueChange.None) publishQueue()
-                }
-            }
         }
 
         /** Mirrors the controller's state into [uiState], the single thing the screen observes. */
@@ -387,34 +377,6 @@ class ShortsViewModel
             }
         }
 
-        /**
-         * Terminal signal for a short the user swiped away from before the watch
-         * threshold fired. Early abandonment emits SKIPPED — the engine's main
-         * source of negative watch evidence on Shorts.
-         */
-        fun recordShortAbandoned(
-            short: ShortVideo,
-            positionMs: Long,
-            durationMs: Long,
-        ) {
-            viewModelScope.launch(PerformanceDispatcher.diskIO) {
-                val video = short.toVideo()
-                val signal = ShortWatchClassifier.classifyAbandon(positionMs, durationMs, video.duration)
-                if (signal != null) {
-                    runCatching {
-                        FlowNeuroEngine.onVideoInteraction(
-                            video.copy(isShort = true),
-                            signal.interaction,
-                            percentWatched = signal.percent,
-                        )
-                        FlowNeuroEngine.recordSeenShorts(listOf(video.id))
-                    }.onFailure { e ->
-                        Log.w(TAG, "Failed to record abandoned short in FlowNeuro", e)
-                    }
-                }
-            }
-        }
-
         fun recordShortWatched(
             short: ShortVideo,
             positionMs: Long,
@@ -422,12 +384,18 @@ class ShortsViewModel
         ) {
             viewModelScope.launch(PerformanceDispatcher.diskIO) {
                 val video = short.toVideo()
-                val signal = ShortWatchClassifier.classify(positionMs, durationMs, video.duration)
+                val safeDuration =
+                    when {
+                        durationMs > 0L -> durationMs
+                        video.duration > 0 -> video.duration * 1000L
+                        else -> 60_000L
+                    }
+                val safePosition = positionMs.coerceAtLeast(1_000L).coerceAtMost(safeDuration)
 
                 viewHistory.savePlaybackPosition(
                     videoId = video.id,
-                    position = signal.position,
-                    duration = signal.safeDuration,
+                    position = safePosition,
+                    duration = safeDuration,
                     title = video.title,
                     thumbnailUrl = video.thumbnailUrl,
                     channelName = video.channelName,
@@ -435,17 +403,6 @@ class ShortsViewModel
                     isMusic = false,
                     isShort = true,
                 )
-
-                runCatching {
-                    FlowNeuroEngine.onVideoInteraction(
-                        video.copy(isShort = true),
-                        signal.interaction,
-                        percentWatched = signal.percent,
-                    )
-                    FlowNeuroEngine.recordSeenShorts(listOf(video.id))
-                }.onFailure { e ->
-                    Log.w(TAG, "Failed to record watched short in FlowNeuro", e)
-                }
             }
         }
 
@@ -462,28 +419,10 @@ class ShortsViewModel
             comments.loadReplies(currentShort.id, comment)
         }
 
-        fun wantMoreLikeThis(short: ShortVideo) {
-            viewModelScope.launch(PerformanceDispatcher.networkIO) {
-                try {
-                    val video = short.toVideo()
-                    FlowNeuroEngine.onVideoInteraction(
-                        video,
-                        InteractionType.LIKED,
-                    )
-                    _snackbarMessage.value = context.getString(R.string.shorts_showing_more_like_this)
-                    Log.d(TAG, "Want more like this: ${short.title}")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error signaling want more", e)
-                }
-            }
-        }
-
         fun notInterested(short: ShortVideo) {
             viewModelScope.launch(PerformanceDispatcher.networkIO) {
                 try {
-                    val video = short.toVideo()
-                    FlowNeuroEngine.markNotInterested(video)
-                    FeedInvalidationBus.emit(FeedInvalidationBus.Event.NotInterested(video.id, video.channelId))
+                    FeedInvalidationBus.emit(FeedInvalidationBus.Event.NotInterested(short.id, short.channelId))
 
                     queue?.remove(short.id)
                     publishQueue()

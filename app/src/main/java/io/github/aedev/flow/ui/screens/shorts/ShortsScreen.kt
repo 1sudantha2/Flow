@@ -356,7 +356,6 @@ fun ShortsScreen(
                                         }
                                     context.startActivity(Intent.createChooser(sendIntent, null))
                                 },
-                                onWantMore = { viewModel.wantMoreLikeThis(short) },
                                 onNotInterested = { viewModel.notInterested(short) },
                                 onVideoEnded = {
                                     scope.launch {

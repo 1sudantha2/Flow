@@ -1,7 +1,13 @@
 name: Arena CI
 
-# Fast feedback loop for the Arena working branch: formatting + compilation
-# only. The full pipeline still lives in build.yml.
+# Fast feedback loop for the Arena working branch: formatting, compilation and
+# unit tests. The full pipeline still lives in build.yml.
+#
+# Because the driving agent cannot download raw job logs (they live on Azure
+# blob storage), every gradle step runs with continue-on-error and tees its
+# output to a file; annotation steps then convert the interesting lines
+# (spotless violations, kotlin compile errors, test failures) into ::error::
+# annotations, which are readable through the GitHub REST API.
 on:
   push:
     branches:
@@ -17,7 +23,7 @@ permissions:
 
 jobs:
   quick-check:
-    name: Spotless + Compile (github debug)
+    name: Spotless + Compile + Unit tests (github debug)
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -41,13 +47,53 @@ jobs:
         run: chmod +x gradlew
 
       - name: Check Kotlin formatting
-        run: ./gradlew spotlessCheck --build-cache --stacktrace
+        id: spotless
+        continue-on-error: true
+        run: ./gradlew spotlessCheck --build-cache 2>&1 | tee /tmp/step_spotless.log
 
       - name: Compile app (github debug)
-        run: ./gradlew :app:assembleGithubDebug --build-cache --stacktrace
+        id: compile
+        continue-on-error: true
+        run: ./gradlew :app:assembleGithubDebug --build-cache 2>&1 | tee /tmp/step_compile.log
+
+      - name: Run unit tests (github debug)
+        id: tests
+        continue-on-error: true
+        run: ./gradlew :app:testGithubDebugUnitTest --build-cache --max-workers=1 2>&1 | tee /tmp/step_tests.log
+
+      - name: Surface spotless violations as annotations
+        if: always() && steps.spotless.outcome == 'failure'
+        run: |
+          set -u
+          grep -E '^\S+\.(kt|kts)' /tmp/step_spotless.log | head -10 | while IFS= read -r line; do
+            echo "::error::needs formatting: $line"
+          done
+
+      - name: Surface compile errors as annotations
+        if: always() && steps.compile.outcome == 'failure'
+        run: |
+          set -u
+          grep -E '^e: ' /tmp/step_compile.log | head -10 | while IFS= read -r line; do
+            echo "::error::${line}"
+          done
+          if ! grep -qE '^e: ' /tmp/step_compile.log; then
+            echo "::error::compile step failed without kotlin errors; see run log"
+          fi
+
+      - name: Surface test failures as annotations
+        if: always() && steps.tests.outcome == 'failure'
+        run: |
+          set -u
+          grep -E 'FAILED' /tmp/step_tests.log | head -10 | while IFS= read -r line; do
+            echo "::error::${line}"
+          done
+
+      - name: Fail the job if any check failed
+        if: always() && (steps.spotless.outcome == 'failure' || steps.compile.outcome == 'failure' || steps.tests.outcome == 'failure')
+        run: exit 1
 
       - name: Upload APK on manual dispatch
-        if: github.event_name == 'workflow_dispatch'
+        if: always() && github.event_name == 'workflow_dispatch' && steps.compile.outcome == 'success'
         uses: actions/upload-artifact@v7
         with:
           name: arena-debug-apk
